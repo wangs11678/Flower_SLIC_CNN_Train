@@ -1,0 +1,90 @@
+#include <boost/make_shared.hpp>
+
+// these need to be included after boost on OS X
+#include <string>
+#include <vector>
+#include <fstream>
+
+#include <opencv2/opencv.hpp>
+
+#include "caffe/caffe.hpp"
+#include "caffe/layers/memory_data_layer.hpp"
+
+using namespace std;
+using namespace cv;
+using namespace caffe;
+
+#define NetF float
+
+
+static void CheckFile(const std::string& filename)
+{
+	std::ifstream f(filename.c_str());
+	if (!f.good())
+	{
+		f.close();
+		throw std::runtime_error("Could not open file " + filename);
+	}
+	f.close();
+}
+
+
+template <typename Dtype> caffe::Net<Dtype>* Net_Init_Load(std::string param_file, std::string pretrained_param_file, caffe::Phase phase)
+{
+	CheckFile(param_file);
+	CheckFile(pretrained_param_file);
+
+	caffe::Net<Dtype>* net(new caffe::Net<Dtype>(param_file, phase));
+
+	net->CopyTrainedLayersFrom(pretrained_param_file, 0);
+	return net;
+}
+
+
+int main()
+{
+
+	const char *deploy_net = "/home/wangs/caffe/models/bvlc_alexnet/deploy_Test.prototxt";
+    const char *model = "/home/wangs/caffe/models/bvlc_alexnet/bvlc_alexnet.caffemodel";
+    
+	cv::Mat src;
+	src = cv::imread("lena.jpg");
+
+	cv::Mat image;
+	cv::resize(src, image, cv::Size(227, 227));
+	
+	std::vector<cv::Mat> dv;
+	dv.push_back(image);
+	std::vector<int> dvl;
+	dvl.push_back(0);
+
+	caffe::Net<NetF>* _net = Net_Init_Load<NetF>(deploy_net, model, caffe::TEST);
+	caffe::MemoryDataLayer<NetF> *m_layer_ = (caffe::MemoryDataLayer<NetF> *)_net->layers()[0].get();
+	m_layer_->AddMatVector(dv, dvl);
+	
+	/*float loss = 0.0;
+	std::vector<caffe::Blob<float>*> results = _net->ForwardPrefilled(&loss);*/
+	int end_ind = _net->layers().size();
+	std::vector<caffe::Blob<NetF>*> input_vec;
+	_net->Forward(input_vec);
+	boost::shared_ptr<caffe::Blob<NetF> > outPool5 = _net->blob_by_name("pool5");
+	std::cout << outPool5->shape()[0] << std::endl;
+	std::cout << outPool5->shape()[1] << std::endl;
+	std::cout << outPool5->shape()[2] << std::endl;
+	std::cout << outPool5->shape()[3] << std::endl;
+
+
+	std::cout << outPool5->num() << std::endl;
+	std::cout << outPool5->channels() << std::endl;
+	std::cout << outPool5->width() << std::endl;
+	std::cout << outPool5->height() << std::endl;
+	std::cout << outPool5->data_at(0, 0, 0, 0) << std::endl;
+	std::cout << outPool5->data_at(0, 0, 1, 1) << std::endl;
+	std::cout << outPool5->data_at(0, 95, 5, 5) << std::endl;
+
+
+	const NetF* pstart = outPool5->cpu_data();
+	std::cout << m_layer_->width() << std::endl;
+	
+	return 0;
+}

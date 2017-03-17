@@ -1,0 +1,121 @@
+#include <string>
+#include <vector>
+#include "boost/algorithm/string.hpp"
+#include "caffe/caffe.hpp"
+
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
+
+using boost::shared_ptr;
+using std::string;
+using namespace caffe;
+using namespace std;
+using namespace cv;
+
+template <typename Dtype> caffe::Net<Dtype>* Net_Init_Load(
+    std::string param_file, std::string pretrained_param_file, caffe::Phase phase)
+{
+    caffe::Net<Dtype>* net(new caffe::Net<Dtype>(param_file, phase));
+
+    net->CopyTrainedLayersFrom(pretrained_param_file);
+    return net;
+}
+
+
+
+int main()
+{
+    /*
+    boost::shared_ptr< Net<float> > feature_net;
+    feature_net = Init_net();
+
+    cv::Mat src1;
+    src1 = cv::imread("test.jpg");
+    //cv::imshow("img", src1);
+    //cv::waitKey(0);
+    //cv::destroyAllWindows();
+    //cv::Mat rszimage;
+
+    //// The mean file image size is 256x256, need to resize the input image to 256x256
+    //cv::resize(src1, rszimage, cv::Size(244, 244));
+    std::vector<cv::Mat> patches;
+    patches.push_back(src1); // image is a cv::Mat, as I'm using #1416
+    std::vector<int> labels; 
+    labels.push_back(0);
+
+    boost::shared_ptr<  MemoryDataLayer<float> >memory_data_layer;
+    memory_data_layer = boost::static_pointer_cast<MemoryDataLayer<float>>(feature_net->layer_by_name("data"));
+    /*
+    caffe::Datum data;
+    caffe::ReadFileToDatum("test.jpg", &data);
+    caffe::MemoryDataLayer<float> *m_layer_ = (caffe::MemoryDataLayer<float> *)feature_net->layers()[0].get();
+    */
+    /*
+    memory_data_layer->AddMatVector(patches,labels);
+
+
+    feature_net->ForwardPrefilled();
+
+    float data1;
+    data1 = Read_Feature_data(feature_net, "fc8");
+    cout << data1 << endl;
+    */
+
+
+
+
+    /*从这里开始*/
+    cv::Mat src1;
+    src1 = cv::imread("test.jpg");
+    //cv::Mat rszimages;
+
+    //cv::resize(src1, rszimages, cv::Size(224, 224));
+    std::vector<cv::Mat> dv;
+    dv.push_back(src1);
+    std::vector<int> label;
+    label.push_back(0);
+
+    //caffe::Datum data;
+    //caffe::ReadFileToDatum("test.jpg", &data);
+
+    caffe::Net<float>* _net = Net_Init_Load<float>("FACE_deploy.prototxt", 
+                                                "FACE.caffemodel", caffe::TEST);
+    caffe::MemoryDataLayer<float> *m_layer_ = (caffe::MemoryDataLayer<float> *)net->layers()[0].get();//**定义个内存数据层指针
+    m_layer_->AddMatVector(dv, label);//***这两行很重要，是使用MemoryData层必须的，这是把图片和标签，添加到
+    //**MemoryData层
+
+    /*float loss = 0.0;
+    std::vector<caffe::Blob<float>*> results = _net->ForwardPrefilled(&loss);*/
+
+    int end_ind = _net->layers().size();
+    std::vector<caffe::Blob<float>*> input_vec;
+
+    clock_t start = clock();
+    _net->Forward(input_vec);
+    clock_t end = clock();
+    double totaltime;
+    totaltime = (double)(end - start) / CLOCKS_PER_SEC;
+    cout << "\n此程序的运行时间为" << totaltime << "秒！" << endl;
+
+
+    boost::shared_ptr<caffe::Blob<float>> fc8 = _net->blob_by_name("fc8");
+    const float* pstart = fc8->cpu_data();// ***这里是重点！重点！重点！，在这里耽误了很长时间。注意这里是个指针
+    //**也就是fc8->cpu_data()返回的一般是多维数据（可以看成是个数组），cout<<* pstart<<endl;这样只是打印出一个
+    //***数？当然是一个数了，*pstart只代表数组的第一个数，因此想获得所有的数据必须用循环！
+    std::cout << "It is right !!\n";
+    //std::cout << m_layer_->width() << std::endl;
+    //std::cout << pstart << endl;
+    //std::cout << fc8->cpu_data() << endl;
+    std::vector<double> V1;
+    for (int i = 0; i < 2622; i++)//**必须用循环打印
+    {
+        std::cout << *pstart << endl;
+        V1.push_back(*pstart);
+        pstart++;
+    }
+    //std::cout << *pstart << endl;
+    //std::cout << *(pstart++) << endl;
+    cout << "\n此程序的运行时间为" << totaltime << "秒！" << endl;
+    return 0;
+}
